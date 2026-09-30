@@ -71,3 +71,19 @@ class FFA(torch.nn.Module):
     xhat = a @ self.wb[0].T
     return xhat, acts
 
+
+
+@dataclass
+class Spec:
+  key
+  title
+  n_classes
+  build
+  image_size
+  hidden_dim
+  max_train
+  max_test
+  manual_check
+  lr
+
+
