@@ -35,7 +35,18 @@ NUM_WORKERS = min(8, os.cpu_count() or 1)
 N_SAMPLES = 8
 
 
-
+@dataclass
+class Spec:
+  key
+  title
+  n_classes
+  build
+  image_size
+  hidden_dim
+  max_train
+  max_test
+  manual_check
+  lr
 
 
 class FFA(torch.nn.Module):
@@ -71,19 +82,44 @@ class FFA(torch.nn.Module):
     xhat = a @ self.wb[0].T
     return xhat, acts
 
+  @torch.no_grad()
+  def ffa_step(self, x, labels, lr = 0.03, recon_weight = 1):
+    L, batch = self.n_layers, x.shape[0]
+    y = F.one_hot(labels, num_classes=self.dims[-1]).to(x.dtype)
+
+    hs = [x]
+    for i in range(L - 1):
+      hs.append(torch.relu(hs[-1] @ self.wf[i].T))
+    logits = hs[-1] @ self.wf[L-1].T
+
+    deltas = [None] * (L + 1)
+    deltas[L] = y - logits
+    for l in range(L, 1, -1):
+      deltas[l - 1] = (deltas[l] @ self.wb[l - 1].T) * (hs[l - 1] > 0)
+    
+    dwf = [deltas[l].T @ hs[l - 1] / batch for l in range(1, L + 1)]
+    class_code = logits.detach()
+    acts = [None] * (L + 1)
+    acts[L] = class_code
+
+    for l in range(L, 1, -1):
+      acts[l - 1] = torch.relu(acts[l] @ self.wb[l - 1].T)
+    xhat = acts[1] @ self.wb[0].T
+    e_rec = x - xhat
+    eps = [None] * L
+    eps[0] = e_rec
+    for l in range(1, L):
+      eps[l] = (eps[l - 1] @ self.wf[l - 1].T) * (acts[l] > 0)
+
+    dwb = [eps[l - 1].T @ acts[l] / batch for l in range(1, L + 1)]
+
+    for i in range(L):
+      self.wf[i].add_(lr * dwf[i])
+      self.wb[i].add_(lr * recon_weight * dwb[i])
+
+    return logits, xhat
+      
 
 
-@dataclass
-class Spec:
-  key
-  title
-  n_classes
-  build
-  image_size
-  hidden_dim
-  max_train
-  max_test
-  manual_check
-  lr
 
 
