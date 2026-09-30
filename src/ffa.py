@@ -61,3 +61,13 @@ class FFA(torch.nn.Module):
 
     logits = h @ self.wf[-1].T
     return logits, hs
+
+  def feedback_path(self, class_code):
+    acts, a = [class_code], class_code
+    for i in range(self.n_layers - 1, 0, -1):
+      a = torch.relu(a @ self.wb[i].T)
+      acts.append(a)
+
+    xhat = a @ self.wb[0].T
+    return xhat, acts
+
