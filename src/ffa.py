@@ -123,3 +123,13 @@ class FFA(torch.nn.Module):
 
 
 
+def train_flag(cls, **kwargs):
+  def build(root, train, transform, download):
+    return cls(root, train=train, transform=transform, download=download, **kwargs)
+  return build
+
+
+def split_flag(cls, train_split, test_split):
+  def build(root, train, transform, download):
+    return cls(root, split=train_split if train else test_split, transform=transform, download=download)
+    return build  
