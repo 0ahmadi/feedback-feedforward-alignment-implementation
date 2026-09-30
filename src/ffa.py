@@ -18,3 +18,46 @@ from torch import Tensor
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 from tqdm import tqdm
+
+DATA_ROOT = Path("./data")
+CACHE_ROOT = Path("./cache")
+OUT_ROOT = Path("./results")
+
+EPOCHS = 100
+N_HIDDEN_LAYERS = 2
+LR_SCALE = 1.0
+BATCH_SIZE = 512    # 128 ?
+EVALS_PER_EPOCH = 10
+NOISE_SIGMA = 0.35
+BASE_LR = 0.03
+SEED = 0
+NUM_WORKERS = min(8, os.cpu_count() or 1)
+N_SAMPLES = 8
+
+
+
+
+
+class FFA(torch.nn.Module):
+  def __init__(self, input_dim, hidden_dim, n_classes, n_hidden_layers = 1):
+    super().__init__()
+    dims = [input_dim] + [hidden_dim] * n_hidden_layers + [n_classes]
+    self.dims = dims
+
+    self.n_layers = len(dims) - 1
+    self.wf = torch.nn.ParameterList(
+      [torch.nn.Parameter(torch.randn(dims[i+1], dims[i]) * 0.03) for i in range(self.n_layers)]
+    )
+
+    self.wb = torch.nn.ParameterList(
+      [torch.nn.Parameter(torch.randn(dims[i], dims[i+1]) * 0.03) for i in range(self.n_layers)]
+    )
+
+  def forward_path(self, x):
+    hs, h = [], x
+    for i in range(self.n_layers - 1):
+      h = torch.relu(h @ self.wf[i].T)
+      hs.append(h)
+
+    logits = h @ self.wf[-1].T
+    return logits, hs
